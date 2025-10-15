@@ -1,5 +1,5 @@
 // src/pages/NewCompaniesPage/index.tsx
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import RateSettingsModal from '../../components/RateSettingsModal';
 import { useRateRules } from '../../rates/useRateRules';
 import {
@@ -14,6 +14,8 @@ import {
   Td,
   Input,
   Select,
+  ReadOnly,
+  ReadOnlyMono,
 } from './styles';
 
 /** 10원 단위 내림 */
@@ -27,7 +29,13 @@ type Row = {
   MID명?: string | null;
   금액?: number | string | null;
   에이전시수수료?: number | string | null;
-  // 필요 시 다른 컬럼들 자유롭게 추가 가능
+};
+
+/** 계산 컬럼 포함 뷰 모델 */
+type ViewRow = Row & {
+  __payRate: number;      // 지급률(소수)
+  __payFee: number;       // 지급수수료(10원 내림)
+  __receiveRate: number;  // 수입수수료(소수)
 };
 
 /** 초기 데이터 로딩용 키 (기존 워크플로우 유지) */
@@ -76,12 +84,6 @@ export default function NewCompaniesPage() {
     }
   });
 
-  /** rows 변경 시 원하면 동기화 (옵션)
-  useEffect(() => {
-    localStorage.setItem(PREVIEW_KEY, JSON.stringify(rows));
-  }, [rows]);
-  */
-
   /** 행 업데이트 유틸 */
   const updateRow = (index: number, patch: Partial<Row>) => {
     setRows(prev => {
@@ -92,7 +94,7 @@ export default function NewCompaniesPage() {
   };
 
   /** 계산 컬럼 포함된 뷰 모델 */
-  const view = useMemo(() => {
+  const view: ViewRow[] = useMemo(() => {
     return rows.map((r) => {
       // v2 평가기: (row 전체, 선택된 구분 라벨) → 최종 지급률(소수)
       const payRate = evaluatePayRate(r as any, r.구분 ?? '');
@@ -102,9 +104,9 @@ export default function NewCompaniesPage() {
 
       return {
         ...r,
-        __payRate: payRate,         // 지급률(소수)
-        __payFee: payFee,           // 지급수수료(10원 내림)
-        __receiveRate: receiveRate, // 수입수수료(소수)
+        __payRate: payRate,
+        __payFee: payFee,
+        __receiveRate: receiveRate,
       };
     });
   }, [rows, evaluatePayRate]);
@@ -185,7 +187,7 @@ export default function NewCompaniesPage() {
                     />
                   </Td>
 
-                  {/* 구분: 동적 라벨 옵션 */}
+                  {/* 구분: 동적 라벨 옵션 (편집 가능) */}
                   <Td>
                     <Select
                       value={row.구분 ?? ''}
@@ -202,33 +204,23 @@ export default function NewCompaniesPage() {
                     </Select>
                   </Td>
 
-                  {/* MID명: 편집 허용 */}
+                  {/* MID명: 🔒 UI 읽기전용 */}
                   <Td>
-                    <Input
-                      value={row.MID명 ?? ''}
-                      placeholder="MID명"
-                      onChange={(e) => updateRow(idx, { MID명: e.target.value })}
-                    />
+                    <ReadOnly title="읽기전용">{row.MID명 ?? ''}</ReadOnly>
                   </Td>
 
-                  {/* 금액: 숫자 입력 */}
-                  <Td>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      value={toNum(row.금액)}
-                      onChange={(e) => updateRow(idx, { 금액: Number(e.target.value) })}
-                    />
+                  {/* 금액: 🔒 UI 읽기전용 */}
+                  <Td mono>
+                    <ReadOnlyMono title="읽기전용">
+                      {toNum(row.금액).toLocaleString()}
+                    </ReadOnlyMono>
                   </Td>
 
-                  {/* 에이전시수수료: 숫자 입력 */}
-                  <Td>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      value={toNum(row.에이전시수수료)}
-                      onChange={(e) => updateRow(idx, { 에이전시수수료: Number(e.target.value) })}
-                    />
+                  {/* 에이전시수수료: 🔒 UI 읽기전용 */}
+                  <Td mono>
+                    <ReadOnlyMono title="읽기전용">
+                      {toNum(row.에이전시수수료).toLocaleString()}
+                    </ReadOnlyMono>
                   </Td>
 
                   {/* 수입수수료(receive rate): 표시(소수) */}

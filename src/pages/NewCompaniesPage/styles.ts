@@ -203,3 +203,18 @@ export const Button = styled.button<{ variant?: 'primary' | 'ghost' }>`
       border-color: #ddd;
     `}
 `;
+
+export const ReadOnly = styled.span`
+  display: block;
+  padding: 8px 6px;
+  color: #374151;           /* gray-700 */
+  cursor: not-allowed;
+  user-select: text;
+  background: #f9fafb;      /* gray-50 */
+  border-radius: 6px;
+`;
+
+export const ReadOnlyMono = styled(ReadOnly)`
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+`;
