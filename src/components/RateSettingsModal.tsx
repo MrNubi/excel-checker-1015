@@ -1,7 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import styled from 'styled-components';
-import {useRateRules} from '../rates/useRateRules'; // default import도 동작하도록 맞추세요
-import type { CategoryDef } from '../rates/rateRules';
+import { useRateRules } from '../rates/useRateRules'; // default import도 동작하도록 맞추세요
+import type { CategoryDef, Rule } from '../rates/rateRules';
+import {
+  Backdrop,
+  Modal,
+  Header,
+  Title,
+  Tabs,
+  TabButton,
+  Body,
+  SectionTitle,
+  Small,
+  Table,
+  Th,
+  Td,
+  Input,
+  SButton,
+  Row,
+  CondList,
+  CondRow,
+  RuleCard,
+  Footer,
+} from './styles';
 
 /* -------- 타입가드 -------- */
 const isSetCategoryEffect = (eff: any): eff is { type: 'setCategory'; categoryId: string } =>
@@ -23,40 +43,104 @@ export default function RateSettingsModal({ open, onClose }: Props) {
   const rate = useRateRules();
   const { snapshot } = rate;
 
+  // ---- 로컬 편집본 (저장 버튼을 누를 때만 반영) ----
   const [localCats, setLocalCats] = useState<CategoryDef[]>(snapshot.categories);
+  const [localRules, setLocalRules] = useState<Rule[]>(snapshot.rules);
+
   const [tab, setTab] = useState<'categories' | 'rules'>('categories');
 
   useEffect(() => {
     if (open) {
       setLocalCats(snapshot.categories);
+      setLocalRules(snapshot.rules);
       setTab('categories');
     }
-  }, [open, snapshot.categories]);
+  }, [open, snapshot.categories, snapshot.rules]);
 
   const sortedRules = useMemo(
-    () => [...snapshot.rules].sort((a, b) => a.priority - b.priority),
-    [snapshot.rules]
+    () => [...localRules].sort((a, b) => a.priority - b.priority),
+    [localRules]
   );
 
   const firstCatId = snapshot.categories[0]?.id ?? '';
 
+  /* ---------------- 저장 로직 ---------------- */
+
+  // 카테고리 저장(일괄 반영)
   const handleSaveCats = () => {
     const old = snapshot.categories;
+
     // 삭제
     old.forEach(c => {
       if (!localCats.find(x => x.id === c.id)) rate.removeCategory(c.id);
     });
-    // 업데이트/추가
+
+    // 추가/수정
     localCats.forEach(c => {
       const prev = old.find(x => x.id === c.id);
-      if (!prev) rate.addCategory(c.label, c.rate);
-      else if (prev.label !== c.label || prev.rate !== c.rate) {
+      if (!prev) {
+        rate.addCategory(c.label, c.rate);
+      } else if (prev.label !== c.label || prev.rate !== c.rate) {
         rate.updateCategory(c.id, { label: c.label, rate: c.rate });
       }
     });
   };
 
-  // ✅ JSX에서 조건부 렌더
+  // 규칙 저장(일괄 반영)
+  const handleSaveRules = () => {
+    const old = snapshot.rules;
+
+    // 삭제
+    old.forEach(r => {
+      if (!localRules.find(x => x.id === r.id)) rate.removeRule(r.id);
+    });
+
+    // 추가/수정
+    localRules.forEach(r => {
+      const prev = old.find(x => x.id === r.id);
+      if (!prev) {
+        // 추가
+        rate.addRule({
+          name: r.name,
+          priority: r.priority,
+          enabled: r.enabled,
+          conditions: r.conditions,
+          effect: r.effect as any,
+        });
+      } else {
+        // 변경 여부 간단 비교(깊은 비교는 필요 시 확장)
+        const changed =
+          prev.name !== r.name ||
+          prev.priority !== r.priority ||
+          prev.enabled !== r.enabled ||
+          JSON.stringify(prev.conditions) !== JSON.stringify(r.conditions) ||
+          JSON.stringify(prev.effect) !== JSON.stringify(r.effect);
+
+        if (changed) {
+          rate.updateRule(r.id, {
+            name: r.name,
+            priority: r.priority,
+            enabled: r.enabled,
+            conditions: r.conditions,
+            effect: r.effect as any,
+          });
+        }
+      }
+    });
+  };
+
+  // 탭에 따라 따로 저장하거나, 한 번에 저장하고 닫기
+  const handleSaveAndClose = () => {
+    if (tab === 'categories') {
+      handleSaveCats();
+    } else {
+      handleSaveRules();
+    }
+    onClose();
+  };
+
+  /* ---------------- 렌더 ---------------- */
+
   return (
     <>
       {open && (
@@ -70,11 +154,12 @@ export default function RateSettingsModal({ open, onClose }: Props) {
               </Tabs>
             </Header>
 
+            {/* ✅ 내부 스크롤: Body만 overflow로 */}
             <Body>
               {tab === 'categories' && (
                 <section>
                   <SectionTitle>카테고리 목록</SectionTitle>
-                  <Small>라벨/지급률(%) 수정, 행 추가·삭제 가능. 저장 시 Select 옵션에 즉시 반영됩니다.</Small>
+                  <Small>라벨/지급률(%) 수정, 행 추가·삭제 후 <b>저장</b>을 눌러 반영됩니다.</Small>
                   <Table>
                     <thead>
                       <tr><Th>라벨</Th><Th>지급률(%)</Th><Th style={{width:96}} /></tr>
@@ -128,30 +213,48 @@ export default function RateSettingsModal({ open, onClose }: Props) {
               {tab === 'rules' && (
                 <section>
                   <SectionTitle>규칙 목록 (우선순위 오름차순 평가, 첫 매칭 1개 적용)</SectionTitle>
-                  <Small>컨디션은 AND 조합. 예: [금액 {'>'}= 500000] & [MID명 contains _분담무이자]</Small>
+                  <Small>컨디션은 AND 조합. 예: [금액 {'>'}= 500000] & [MID명 contains _분담무이자]. <b>저장</b>을 눌러야 반영됩니다.</Small>
 
-                  {sortedRules.map(r => (
-                    <RuleCard key={r.id}>
+                  {sortedRules.map((r, idx) => (
+                    <RuleCard key={r.id ?? idx}>
                       <Row>
                         <label>ON</label>
                         <input
                           type="checkbox"
                           checked={r.enabled}
-                          onChange={(e) => rate.updateRule(r.id, { enabled: e.target.checked })}
+                          onChange={(e) =>
+                            setLocalRules(list =>
+                              list.map(x => x.id === r.id ? { ...x, enabled: e.target.checked } : x)
+                            )
+                          }
                         />
                         <label style={{ marginLeft: 12 }}>이름</label>
                         <Input
                           value={r.name}
-                          onChange={(e) => rate.updateRule(r.id, { name: e.target.value })}
+                          onChange={(e) =>
+                            setLocalRules(list =>
+                              list.map(x => x.id === r.id ? { ...x, name: e.target.value } : x)
+                            )
+                          }
                         />
                         <label style={{ marginLeft: 12 }}>우선순위</label>
                         <Input
                           type="number"
                           value={r.priority}
-                          onChange={(e) => rate.updateRule(r.id, { priority: Number(e.target.value) })}
+                          onChange={(e) =>
+                            setLocalRules(list =>
+                              list.map(x => x.id === r.id ? { ...x, priority: Number(e.target.value) || 0 } : x)
+                            )
+                          }
                           style={{ width: 100 }}
                         />
-                        <SButton $variant="danger" style={{ marginLeft: 'auto' }} onClick={() => rate.removeRule(r.id)}>삭제</SButton>
+                        <SButton
+                          $variant="danger"
+                          style={{ marginLeft: 'auto' }}
+                          onClick={() => setLocalRules(list => list.filter(x => x.id !== r.id))}
+                        >
+                          삭제
+                        </SButton>
                       </Row>
 
                       <Row>
@@ -160,11 +263,14 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                           value={isSetPayRateEffect(r.effect) ? 'setPayRate' : 'setCategory'}
                           onChange={(e) => {
                             const t = e.target.value as 'setPayRate' | 'setCategory';
-                            if (t === 'setPayRate') {
-                              rate.updateRule(r.id, { effect: { type: 'setPayRate', value: 0.0008 } });
-                            } else {
-                              rate.updateRule(r.id, { effect: { type: 'setCategory', categoryId: firstCatId } });
-                            }
+                            setLocalRules(list =>
+                              list.map(x => x.id === r.id
+                                ? (t === 'setPayRate'
+                                    ? { ...x, effect: { type: 'setPayRate', value: 0.0008 } as any }
+                                    : { ...x, effect: { type: 'setCategory', categoryId: firstCatId } as any })
+                                : x
+                              )
+                            );
                           }}
                         >
                           <option value="setPayRate">setPayRate</option>
@@ -179,7 +285,12 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                               step="0.0001"
                               value={r.effect.value}
                               onChange={(e) =>
-                                rate.updateRule(r.id, { effect: { type: 'setPayRate', value: Number(e.target.value) || 0 } })
+                                setLocalRules(list =>
+                                  list.map(x => x.id === r.id
+                                    ? { ...x, effect: { type: 'setPayRate', value: Number(e.target.value) || 0 } as any }
+                                    : x
+                                  )
+                                )
                               }
                               style={{ width: 140 }}
                             />
@@ -190,7 +301,12 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                             <select
                               value={isSetCategoryEffect(r.effect) ? r.effect.categoryId : firstCatId}
                               onChange={(e) =>
-                                rate.updateRule(r.id, { effect: { type: 'setCategory', categoryId: e.target.value } })
+                                setLocalRules(list =>
+                                  list.map(x => x.id === r.id
+                                    ? { ...x, effect: { type: 'setCategory', categoryId: e.target.value } as any }
+                                    : x
+                                  )
+                                )
                               }
                             >
                               {snapshot.categories.map(c => (
@@ -204,13 +320,21 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                       <CondList>
                         <label>조건(AND)</label>
                         {r.conditions.map((c, i) => (
-                          <CondRow key={i}>
+                          <CondRow key={`${r.id}-cond-${i}`}>
                             <select
-                              value={c.field}
+                              value={c.field as any}
                               onChange={(e) =>
-                                rate.updateRule(r.id, {
-                                  conditions: r.conditions.map((cc, j) => (j === i ? { ...cc, field: e.target.value as any } : cc)),
-                                })
+                                setLocalRules(list =>
+                                  list.map(x => x.id === r.id
+                                    ? {
+                                        ...x,
+                                        conditions: x.conditions.map((cc, j) =>
+                                          j === i ? { ...cc, field: e.target.value as any } : cc
+                                        ),
+                                      }
+                                    : x
+                                  )
+                                )
                               }
                             >
                               {(['MID명','금액','에이전시수수료','구분인덱스','사업자번호','MID','GID'] as const).map(f => (
@@ -219,11 +343,19 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                             </select>
 
                             <select
-                              value={c.op}
+                              value={c.op as any}
                               onChange={(e) =>
-                                rate.updateRule(r.id, {
-                                  conditions: r.conditions.map((cc, j) => (j === i ? { ...cc, op: e.target.value as any } : cc)),
-                                })
+                                setLocalRules(list =>
+                                  list.map(x => x.id === r.id
+                                    ? {
+                                        ...x,
+                                        conditions: x.conditions.map((cc, j) =>
+                                          j === i ? { ...cc, op: e.target.value as any } : cc
+                                        ),
+                                      }
+                                    : x
+                                  )
+                                )
                               }
                             >
                               {['contains','not_contains','==','!=','>','>=','<','<=','in','not_in','is_empty','not_empty'].map(op => (
@@ -238,11 +370,17 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                                 placeholder="A,B,C"
                                 value={Array.isArray(c.value) ? c.value.join(',') : (c.value ?? '')}
                                 onChange={(e) =>
-                                  rate.updateRule(r.id, {
-                                    conditions: r.conditions.map((cc, j) =>
-                                      j === i ? { ...cc, value: e.target.value.split(',').map(s => s.trim()) } : cc
-                                    ),
-                                  })
+                                  setLocalRules(list =>
+                                    list.map(x => x.id === r.id
+                                      ? {
+                                          ...x,
+                                          conditions: x.conditions.map((cc, j) =>
+                                            j === i ? { ...cc, value: e.target.value.split(',').map(s => s.trim()) } : cc
+                                          ),
+                                        }
+                                      : x
+                                    )
+                                  )
                                 }
                                 style={{ width: 220 }}
                               />
@@ -251,11 +389,17 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                                 placeholder="값"
                                 value={c.value ?? ''}
                                 onChange={(e) =>
-                                  rate.updateRule(r.id, {
-                                    conditions: r.conditions.map((cc, j) =>
-                                      j === i ? { ...cc, value: e.target.value } : cc
-                                    ),
-                                  })
+                                  setLocalRules(list =>
+                                    list.map(x => x.id === r.id
+                                      ? {
+                                          ...x,
+                                          conditions: x.conditions.map((cc, j) =>
+                                            j === i ? { ...cc, value: e.target.value } : cc
+                                          ),
+                                        }
+                                      : x
+                                    )
+                                  )
                                 }
                                 style={{ width: 220 }}
                               />
@@ -264,7 +408,12 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                             <SButton
                               $variant="danger"
                               onClick={() =>
-                                rate.updateRule(r.id, { conditions: r.conditions.filter((_, j) => j !== i) })
+                                setLocalRules(list =>
+                                  list.map(x => x.id === r.id
+                                    ? { ...x, conditions: x.conditions.filter((_, j) => j !== i) }
+                                    : x
+                                  )
+                                )
                               }
                             >
                               - 조건
@@ -275,7 +424,12 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                         <SButton
                           $variant="ghost"
                           onClick={() =>
-                            rate.updateRule(r.id, { conditions: [...r.conditions, { field: '금액', op: '>=', value: 0 }] })
+                            setLocalRules(list =>
+                              list.map(x => x.id === r.id
+                                ? { ...x, conditions: [...x.conditions, { field: '금액' as any, op: '>=' as any, value: 0 }] }
+                                : x
+                              )
+                            )
                           }
                         >
                           + 조건
@@ -287,13 +441,18 @@ export default function RateSettingsModal({ open, onClose }: Props) {
                   <SButton
                     $variant="ghost"
                     onClick={() =>
-                      rate.addRule({
-                        name: '새 규칙',
-                        priority: (sortedRules.slice(-1)[0]?.priority ?? 50) + 10,
-                        enabled: true,
-                        conditions: [{ field: 'MID명', op: 'contains', value: '' }],
-                        effect: { type: 'setPayRate', value: 0.0008 },
-                      })
+                      setLocalRules(prev => [
+                        ...prev,
+                        {
+                          id: `rule-${Math.random().toString(36).slice(2, 8)}`,
+                          name: '새 규칙',
+                          priority: (sortedRules.slice(-1)[0]?.priority ?? 50) + 10,
+                          enabled: true,
+                          conditions: [{ field: 'MID명' as any, op: 'contains' as any, value: '' }],
+                          effect: { type: 'setPayRate', value: 0.0008 } as any,
+                          payRate: 0, // (구형 구조 호환용 값이 있으면 유지/무시)
+                        } as Rule,
+                      ])
                     }
                   >
                     + 규칙 추가
@@ -302,9 +461,13 @@ export default function RateSettingsModal({ open, onClose }: Props) {
               )}
             </Body>
 
+            {/* ✅ 푸터 고정 + 저장 버튼 (현재 탭만 저장) */}
             <Footer>
               {tab === 'categories' && (
                 <SButton $variant="primary" onClick={handleSaveCats}>카테고리 저장</SButton>
+              )}
+              {tab === 'rules' && (
+                <SButton $variant="primary" onClick={handleSaveRules}>규칙 저장</SButton>
               )}
               <SButton $variant="ghost" onClick={onClose}>닫기</SButton>
             </Footer>
@@ -314,49 +477,3 @@ export default function RateSettingsModal({ open, onClose }: Props) {
     </>
   );
 }
-
-/* ------- styles (variant/active는 transient prop으로) ------- */
-const Backdrop = styled.div`
-  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-  display: flex; align-items: center; justify-content: center; z-index: 1000;
-`;
-const Modal = styled.div`
-  width: 900px; max-width: 96vw; background: #fff; border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden;
-`;
-const Header = styled.div`
-  padding: 16px 20px; border-bottom: 1px solid #eee;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-`;
-const Title = styled.div` font-weight: 800; font-size: 18px; `;
-const Tabs = styled.div` display: flex; gap: 8px; `;
-const TabButton = styled.button<{ $active?: boolean }>`
-  padding: 6px 10px; border-radius: 8px; border: 1px solid #ddd; cursor: pointer;
-  ${({ $active }) => $active ? 'background:#111;color:#fff;border-color:#111;' : 'background:#fff;color:#111;'}
-`;
-const Body = styled.div` padding: 16px 20px; display: grid; gap: 20px; `;
-const SectionTitle = styled.div` font-weight: 700; `;
-const Small = styled.div` font-size: 12px; color: #666; `;
-const Table = styled.table`
-  width: 100%; border-collapse: collapse; font-size: 14px;
-  th,td{ border-bottom:1px solid #f0f0f0; padding:10px; text-align:left; }
-  th{ background:#fafafa; font-weight:600; }
-`;
-const Th = styled.th``;
-const Td = styled.td``;
-const Input = styled.input`
-  padding: 6px 8px; border:1px solid #ddd; border-radius:8px; font-size:14px;
-`;
-const SButton = styled.button<{ $variant?: 'primary' | 'ghost' | 'danger' }>`
-  padding: 8px 12px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; font-weight: 600;
-  ${({ $variant }) => $variant === 'primary' && `background:#111; color:#fff;`}
-  ${({ $variant }) => $variant === 'ghost'   && `background:#fff; color:#111; border-color:#ddd;`}
-  ${({ $variant }) => $variant === 'danger'  && `background:#fff0f0; color:#c00; border-color:#f3c2c2;`}
-`;
-const Row = styled.div` display:flex; align-items:center; gap:8px; flex-wrap:wrap; `;
-const CondList = styled.div` display:grid; gap:8px; margin-top:8px; `;
-const CondRow = styled.div` display:flex; gap:8px; align-items:center; `;
-const RuleCard = styled.div` border:1px solid #eee; border-radius:12px; padding:12px; `;
-const Footer = styled.div`
-  padding: 14px 20px; border-top: 1px solid #eee; display: flex; gap: 8px; justify-content: flex-end;
-`;
