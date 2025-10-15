@@ -1,0 +1,15 @@
+[
+  {
+    "month_str": "2025-04",
+    "partner_name": "대한레이저피부모발학회",
+    "business_no_raw": "771-260-1611",
+    "merchant_name": "케이톡스의원 인천구월점",
+    "mid_raw": "MID-XYZ",
+    "pay_method_raw": "신용카드",
+    "currency": "KRW",
+    "txn_count": 10,
+    "amount": 19999,
+    "agency_fee": 999,
+    "grade_raw": "중소1"
+  }
+]
