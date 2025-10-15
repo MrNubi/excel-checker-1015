@@ -164,4 +164,4 @@ for (const rule of sorted) {
 }
 
 export {useRateRules}
-export default useRateRules()
+export default useRateRules
