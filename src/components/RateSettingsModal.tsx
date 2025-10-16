@@ -23,7 +23,7 @@ import {
   Footer,
 } from './styles';
 
-/* -------- 타입가드 -------- */
+/* -------- 타입가드 2-------- */
 const isSetCategoryEffect = (eff: any): eff is { type: 'setCategory'; categoryId: string } =>
   eff?.type === 'setCategory' && 'categoryId' in eff;
 const isSetPayRateEffect = (eff: any): eff is { type: 'setPayRate'; value: number } =>
