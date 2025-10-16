@@ -16,7 +16,7 @@ const API_BL_LIST = `${API_BL_BASE}/entries?active=1`;
 const API_BL_ACT = `${API_BL_BASE}/activate`;
 const API_BL_DEACT = `${API_BL_BASE}/deactivate`;
 //work start tlwkr walk
-
+// 영원히
 type SheetRow = {
   제휴처: string;
   사업자번호: string;
