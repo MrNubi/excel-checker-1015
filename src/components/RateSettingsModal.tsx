@@ -130,14 +130,14 @@ export default function RateSettingsModal({ open, onClose }: Props) {
   };
 
   // 탭에 따라 따로 저장하거나, 한 번에 저장하고 닫기
-  const handleSaveAndClose = () => {
-    if (tab === 'categories') {
-      handleSaveCats();
-    } else {
-      handleSaveRules();
-    }
-    onClose();
-  };
+  // const handleSaveAndClose = () => {
+  //   if (tab === 'categories') {
+  //     handleSaveCats();
+  //   } else {
+  //     handleSaveRules();
+  //   }
+  //   onClose();
+  // };
 
   /* ---------------- 렌더 ---------------- */
 
