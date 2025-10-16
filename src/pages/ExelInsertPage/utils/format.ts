@@ -12,7 +12,7 @@ export function formatValue(v: any) {
       return '(유효하지 않은 날짜)';
     }
 
-    // 빈 문자열 표시 11
+    // 빈 문자열 표시 112233
     if (typeof v === 'string' && v.trim() === '') return '(빈문자열)';
 
     // 객체는 JSON으로
