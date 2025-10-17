@@ -3,7 +3,7 @@ export function formatValue(v: any) {
     if (v === null) return 'null';
     if (v === undefined) return 'undefined';
 
-    // Date 객체 처리(유효성 검사 포함)
+    // Date 객체 처리(유효성 검사 포함)334555
     if (v instanceof Date) {
       const t = v.getTime();
       if (Number.isFinite(t)) {
@@ -12,7 +12,7 @@ export function formatValue(v: any) {
       return '(유효하지 않은 날짜)';
     }
 
-    // 빈 문자열 표시
+    // 빈 문자열 표시 112233
     if (typeof v === 'string' && v.trim() === '') return '(빈문자열)';
 
     // 객체는 JSON으로
