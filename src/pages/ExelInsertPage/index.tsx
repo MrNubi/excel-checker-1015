@@ -350,11 +350,11 @@ export default function Page() {
     localStorage.setItem("registerPreview", JSON.stringify(list));
     nav("/new-companies");
   };
-
+//  <P>엑셀과 최신 원본을 비교해 신규만 추립니다. 블랙리스트와 겹치는 항목은 아래에 분리됩니다.</P> 분리
   return (
     <Container>
       <H1>정산 엑셀 업로드 · 2차검사</H1>
-      <P>엑셀과 최신 원본을 비교해 신규만 추립니다. 블랙리스트와 겹치는 항목은 아래에 분리됩니다.</P>
+     
 
       <Card>
         <Row style={{ gap: 12, flexWrap: "wrap" }}>
